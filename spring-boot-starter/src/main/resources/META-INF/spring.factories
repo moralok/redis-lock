@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.moralok.redislock.springboot.starter.RedisLockAutoConfiguration

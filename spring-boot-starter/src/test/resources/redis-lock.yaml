@@ -1,0 +1,4 @@
+redis-lock:
+  host: 192.168.46.135
+  port: 6379
+  database: 0
