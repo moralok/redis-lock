@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * RedisLockManager
@@ -32,11 +34,17 @@ public class RedisLockManager {
      */
     private Map<String, RedisReentrantLock> lockCache = new ConcurrentHashMap<>();
 
+    /**
+     * scheduler
+     */
+    private ScheduledExecutorService scheduler;
+
     private volatile boolean shutdown = false;
 
     public RedisLockManager(RedisClient redisClient) {
         this.redisClient = redisClient;
         this.connection = redisClient.connect();
+        this.scheduler = Executors.newScheduledThreadPool(1);
     }
 
     /**
@@ -49,7 +57,7 @@ public class RedisLockManager {
         if (shutdown) {
             throw new RedisLockException("This RedisLockManager had been shutdown already");
         }
-        return lockCache.computeIfAbsent(lockKey, key -> new RedisReentrantLock(connection, lockKey));
+        return lockCache.computeIfAbsent(lockKey, key -> new RedisReentrantLock(connection, lockKey, scheduler));
     }
 
     /**
@@ -62,6 +70,7 @@ public class RedisLockManager {
         }
         logger.info("RedisLockManager shutdown start...");
         shutdown = true;
+        scheduler.shutdown();
         connection.close();
         redisClient.shutdown();
         logger.info("RedisLockManager shutdown end");

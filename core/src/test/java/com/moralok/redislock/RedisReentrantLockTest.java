@@ -108,14 +108,29 @@ class RedisReentrantLockTest {
         Assertions.assertNull(throwable[0]);
     }
 
+    @Test
+    void renewalLock() {
+        Thread t1 = new Thread(this::_lockFor40sWithRetry, "t1");
+        t1.start();
+        try {
+            TimeUnit.SECONDS.sleep(30);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        Assertions.assertThrows(RedisLockException.class, this::_lockWithRetry);
+        try {
+            t1.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private void _lockWithRetry() {
         RedisReentrantLock lock = redisLockManager.getLock(lockKey);
         try {
             lock.lock(3);
             logger.info("processing start...");
             logger.info("processing end");
-        } catch (Exception e) {
-            logger.debug("Exception: {}", e.getMessage());
         } finally {
             lock.unlock();
         }
@@ -127,8 +142,6 @@ class RedisReentrantLockTest {
             lock.lock(200, TimeUnit.MILLISECONDS);
             logger.info("processing start...");
             logger.info("processing end");
-        } catch (Exception e) {
-            logger.debug("Exception: {}", e.getMessage());
         } finally {
             lock.unlock();
         }
@@ -169,6 +182,20 @@ class RedisReentrantLockTest {
             lock.lock(150, TimeUnit.MILLISECONDS);
             logger.info("processing start...");
             TimeUnit.MILLISECONDS.sleep(200);
+            logger.info("processing end");
+        } catch (InterruptedException e) {
+            logger.info("InterruptedException: {}", e.getMessage());
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void _lockFor40sWithRetry() {
+        RedisReentrantLock lock = redisLockManager.getLock(lockKey);
+        try {
+            lock.lock(3);
+            logger.info("processing start...");
+            TimeUnit.SECONDS.sleep(40);
             logger.info("processing end");
         } catch (InterruptedException e) {
             logger.info("InterruptedException: {}", e.getMessage());

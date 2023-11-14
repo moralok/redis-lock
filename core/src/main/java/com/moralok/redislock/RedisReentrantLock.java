@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,31 +24,47 @@ public class RedisReentrantLock {
 
     private static final String LOCK_PREFIX = "distributed_lock:";
 
-    private static final int LOCK_EXPIRE = 10_000;
+    private static final int LOCK_EXPIRE = 30_000;
+
+    private static final int RENEWAL_INTERVAL = 10_000;
 
     public static final String UNLOCK_SCRIPT = "if redis.call('get', KEYS[1]) == ARGV[1] then " +
-                                               "  return redis.call('del', KEYS[1]) " +
-                                               "else " +
-                                               "  return 0 " +
-                                               "end";
+            "  return redis.call('del', KEYS[1]) " +
+            "else " +
+            "  return 0 " +
+            "end";
+
+    public static final String RENEWAL_SCRIPT = "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+            "  redis.call('pexpire', KEYS[1], ARGV[2]) " +
+            "  return true " +
+            "end " +
+            "return false ";
 
     private ThreadLocal<Integer> lockCount = ThreadLocal.withInitial(() -> 0);
 
     private ThreadLocal<String> lockValue = ThreadLocal.withInitial(() -> UUID.randomUUID().toString());
 
+    private ThreadLocal<ScheduledFuture<?>> renewalTask = new ThreadLocal<>();
+
     private AtomicReference<String> UNLOCK_SCRIPT_SHA = new AtomicReference<>();
+
+    private AtomicReference<String> RENEWAL_SCRIPT_SHA = new AtomicReference<>();
 
     private StatefulRedisConnection<String, String> connection;
 
     private RedisCommands<String, String> commands;
 
+    private ScheduledExecutorService scheduler;
+
     private String lockKey;
 
-    public RedisReentrantLock(StatefulRedisConnection<String, String> connection, String lockKey) {
+    public RedisReentrantLock(StatefulRedisConnection<String, String> connection, String lockKey, ScheduledExecutorService scheduler) {
         this.connection = connection;
         this.commands = connection.sync();
+        this.scheduler = scheduler;
         this.lockKey = LOCK_PREFIX + lockKey;
         this.UNLOCK_SCRIPT_SHA.compareAndSet(null, commands.scriptLoad(UNLOCK_SCRIPT));
+        this.RENEWAL_SCRIPT_SHA.compareAndSet(null, commands.scriptLoad(RENEWAL_SCRIPT));
     }
 
     public void lock(int retryTimes) {
@@ -95,6 +113,7 @@ public class RedisReentrantLock {
         if ("OK".equals(result)) {
             lockCount.set(lockCount.get() + 1);
             logger.debug("Get lock[{}], lockValue[{}], lockCount[{}]", lockKey, lockValue.get(), lockCount.get());
+            scheduleRenewal();
             return true;
         }
         return false;
@@ -106,12 +125,37 @@ public class RedisReentrantLock {
             lockCount.set(lockCount.get() - 1);
         }
         if (lockCount.get().equals(0)) {
+            // Regardless of whether you hold the lock, try to cancel the task.
+            cancelRenewal();
             String currentValue = commands.get(lockKey);
             if (lockValue.get().equals(currentValue)) {
                 logger.debug("Delete lockKey[{}], value[{}]", lockKey, currentValue);
                 commands.evalsha(UNLOCK_SCRIPT_SHA.get(), ScriptOutputType.INTEGER, new String[]{lockKey}, currentValue);
+            } else {
+                logger.debug("Try to unlock other's lock, lockValue[{}], current[{}]", lockValue.get(), currentValue);
             }
-            logger.debug("Try to unlock other's lock, lockValue[{}], current[{}]", lockValue.get(), currentValue);
+        }
+    }
+
+    private void scheduleRenewal() {
+        String value = lockValue.get();
+        logger.debug("schedule renewal task for lockKey[{}], lockValue[{}] lockCount[{}]", lockKey, value, lockCount.get());
+        // Do not use lockValue.get() in task, otherwise the wrong value will be obtained.
+        ScheduledFuture<?> scheduledFuture = scheduler.scheduleAtFixedRate(() -> this.renewal(value), RENEWAL_INTERVAL, RENEWAL_INTERVAL, TimeUnit.MILLISECONDS);
+        renewalTask.set(scheduledFuture);
+    }
+
+    private void renewal(String value) {
+        logger.debug("renewal lockKey[{}], lockValue[{}] lockCount[{}]", lockKey, value, lockCount.get());
+        commands.evalsha(RENEWAL_SCRIPT_SHA.get(), ScriptOutputType.BOOLEAN, new String[]{lockKey}, value, String.valueOf(LOCK_EXPIRE));
+    }
+
+    private void cancelRenewal() {
+        ScheduledFuture<?> scheduledFuture = renewalTask.get();
+        if (scheduledFuture != null) {
+            logger.debug("Cancel renewal task for lockKey[{}], lockValue[{}] lockCount[{}]", lockKey, lockValue.get(), lockCount.get());
+            scheduledFuture.cancel(false);
+            renewalTask.remove();
         }
     }
 }
