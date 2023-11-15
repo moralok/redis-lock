@@ -1,4 +1,4 @@
-package com.moralok.redislock.core.autoconfigure;
+package com.moralok.redislock.autoconfigure;
 
 import com.moralok.redislock.core.RedisLockManager;
 import com.moralok.redislock.core.RedisReentrantLock;

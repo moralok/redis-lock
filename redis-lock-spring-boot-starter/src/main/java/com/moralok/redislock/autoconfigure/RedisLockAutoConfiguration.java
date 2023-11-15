@@ -1,15 +1,15 @@
-package com.moralok.redislock.core.autoconfigure;
+package com.moralok.redislock.autoconfigure;
 
 import com.moralok.redislock.core.RedisLockManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-@Configurable
+@Configuration
 @EnableConfigurationProperties(RedisLockProperties.class)
 public class RedisLockAutoConfiguration {
 

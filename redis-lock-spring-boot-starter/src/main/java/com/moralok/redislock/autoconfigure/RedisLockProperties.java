@@ -1,4 +1,4 @@
-package com.moralok.redislock.core.autoconfigure;
+package com.moralok.redislock.autoconfigure;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -10,17 +10,17 @@ public class RedisLockProperties {
     /**
      * host
      */
-    private String host;
+    private String host = "localhost";
 
     /**
      * port
      */
-    private int port;
+    private int port = 6379;
 
     /**
      * database
      */
-    private int database;
+    private int database = 0;
 
     /**
      * username
