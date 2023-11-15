@@ -1,4 +1,4 @@
-package com.moralok.redislock;
+package com.moralok.redislock.core;
 
 import io.lettuce.core.RedisClient;
 import org.junit.jupiter.api.AfterEach;

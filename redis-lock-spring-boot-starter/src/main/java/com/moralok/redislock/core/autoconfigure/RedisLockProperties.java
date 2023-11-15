@@ -1,4 +1,4 @@
-package com.moralok.redislock.springboot.starter;
+package com.moralok.redislock.core.autoconfigure;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

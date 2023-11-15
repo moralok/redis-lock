@@ -1,7 +1,7 @@
-package com.moralok.redislock.springboot.starter;
+package com.moralok.redislock.core.autoconfigure;
 
-import com.moralok.redislock.RedisLockManager;
-import com.moralok.redislock.RedisReentrantLock;
+import com.moralok.redislock.core.RedisLockManager;
+import com.moralok.redislock.core.RedisReentrantLock;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

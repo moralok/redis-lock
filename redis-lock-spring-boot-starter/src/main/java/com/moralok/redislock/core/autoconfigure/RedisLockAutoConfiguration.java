@@ -1,6 +1,6 @@
-package com.moralok.redislock.springboot.starter;
+package com.moralok.redislock.core.autoconfigure;
 
-import com.moralok.redislock.RedisLockManager;
+import com.moralok.redislock.core.RedisLockManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import org.springframework.beans.factory.annotation.Autowired;
